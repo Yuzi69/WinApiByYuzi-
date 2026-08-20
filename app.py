@@ -1,4 +1,5 @@
-# api.py - Single File Vercel Deployment (No Database, No Extra Files)
+# api.py - Complete Vercel Host Ready Code
+# Just copy this single file and deploy on Vercel
 
 import json
 import requests
@@ -6,72 +7,44 @@ from datetime import datetime
 import random
 from collections import deque
 
-# ==================== IN-MEMORY STORAGE ====================
+# ==================== STORAGE ====================
 history_logs = deque(maxlen=50)
 current_prediction = None
 last_period = None
 
-# ==================== EXTERNAL API ====================
+# ==================== FETCH EXTERNAL DATA ====================
 def fetch_external_data():
-    """Fetch data from external API"""
     url = "https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json"
-    
     try:
         response = requests.get(url, timeout=10)
         if response.status_code != 200:
             return None
-        
         data = response.json()
         if not data.get('data', {}).get('list'):
             return None
-        
         return data
-    except Exception as e:
+    except:
         return None
 
 # ==================== PREDICTION LOGIC ====================
 def determine_prediction(history):
-    """Determine prediction based on trend analysis"""
     trend = history[:3]
     big_count = sum(1 for entry in trend if entry['number'] >= 5)
-    
     prediction = 'BIG' if big_count >= 2 else 'SMALL'
     opp = [0, 1, 2, 3, 4] if prediction == 'BIG' else [5, 6, 7, 8, 9]
     predicted_number = random.choice(opp)
-    
-    return {
-        'prediction': prediction,
-        'predicted_number': predicted_number
-    }
+    return {'prediction': prediction, 'predicted_number': predicted_number}
 
 def calculate_result(prediction, predicted_number, actual_number):
-    """Calculate win/loss result"""
     actual_size = 'BIG' if actual_number >= 5 else 'SMALL'
     win_emojis = ["😎", "🔥", "💚", "✅", "🟢", "🏆", "⚡", "💥", "👑", "🚀"]
     loss_emojis = ["😢", "❌", "🔴", "💔", "😞", "🥲", "😵", "🚫", "😬", "😓"]
     
     if actual_number == predicted_number:
-        return {
-            'status': 'JACKPOT',
-            'result': '🎉 JACKPOT',
-            'class': 'jackpot',
-            'size': actual_size
-        }
-    
+        return {'status': 'JACKPOT', 'result': '🎉 JACKPOT', 'class': 'jackpot', 'size': actual_size}
     if actual_size == prediction:
-        return {
-            'status': 'WIN',
-            'result': 'WIN ' + random.choice(win_emojis),
-            'class': 'win',
-            'size': actual_size
-        }
-    
-    return {
-        'status': 'LOSS',
-        'result': 'LOSS ' + random.choice(loss_emojis),
-        'class': 'loss',
-        'size': actual_size
-    }
+        return {'status': 'WIN', 'result': 'WIN ' + random.choice(win_emojis), 'class': 'win', 'size': actual_size}
+    return {'status': 'LOSS', 'result': 'LOSS ' + random.choice(loss_emojis), 'class': 'loss', 'size': actual_size}
 
 # ==================== RESPONSE HELPER ====================
 def send_response(success, message, data=None):
@@ -103,7 +76,6 @@ def handle_get():
                     current_prediction['predicted_number'],
                     actual_number
                 )
-                
                 history_logs.appendleft({
                     'period': str(last_period),
                     'prediction': current_prediction['prediction'],
@@ -184,7 +156,7 @@ def handler(request):
         'body': json.dumps(response)
     }
 
-# ==================== LOCAL DEVELOPMENT ====================
+# ==================== LOCAL RUN ====================
 if __name__ == '__main__':
     from http.server import HTTPServer, BaseHTTPRequestHandler
     import sys
