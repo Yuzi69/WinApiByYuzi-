@@ -1,5 +1,4 @@
-# api.py - Vercel Serverless Function (No Database Required)
-# Pure GET API - Stores data in memory/cache
+# api.py - Single File Vercel Deployment (No Database, No Extra Files)
 
 import json
 import requests
@@ -8,12 +7,11 @@ import random
 from collections import deque
 
 # ==================== IN-MEMORY STORAGE ====================
-# Using deque for automatic size management
-history_logs = deque(maxlen=50)  # Store last 50 records
+history_logs = deque(maxlen=50)
 current_prediction = None
 last_period = None
 
-# ==================== EXTERNAL API FUNCTIONS ====================
+# ==================== EXTERNAL API ====================
 def fetch_external_data():
     """Fetch data from external API"""
     url = "https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json"
@@ -77,7 +75,6 @@ def calculate_result(prediction, predicted_number, actual_number):
 
 # ==================== RESPONSE HELPER ====================
 def send_response(success, message, data=None):
-    """Create standardized JSON response"""
     return {
         'success': success,
         'message': message,
@@ -87,11 +84,9 @@ def send_response(success, message, data=None):
 
 # ==================== MAIN HANDLER ====================
 def handle_get():
-    """Main GET request handler - No database required"""
     global current_prediction, last_period, history_logs
     
     try:
-        # Fetch external data
         external_data = fetch_external_data()
         if not external_data:
             return send_response(False, 'Failed to fetch external data')
@@ -100,10 +95,7 @@ def handle_get():
         current_period = int(last_entry['issueNumber']) + 1
         history = external_data['data']['list']
         
-        # Check if period changed
         if last_period != current_period:
-            
-            # Process previous prediction if exists
             if current_prediction and last_period:
                 actual_number = int(last_entry['number'])
                 result = calculate_result(
@@ -112,7 +104,6 @@ def handle_get():
                     actual_number
                 )
                 
-                # Store in history
                 history_logs.appendleft({
                     'period': str(last_period),
                     'prediction': current_prediction['prediction'],
@@ -124,7 +115,6 @@ def handle_get():
                     'class': result['class']
                 })
             
-            # Generate new prediction
             prediction_data = determine_prediction(history)
             current_prediction = {
                 'period': str(current_period),
@@ -137,22 +127,17 @@ def handle_get():
             }
             last_period = current_period
         
-        # Prepare current prediction response
         response = current_prediction.copy()
         
-        # Calculate statistics from history
         total = len(history_logs)
         wins = sum(1 for h in history_logs if h['status'] == 'WIN')
         losses = sum(1 for h in history_logs if h['status'] == 'LOSS')
         jackpots = sum(1 for h in history_logs if h['status'] == 'JACKPOT')
         win_rate = round(((wins + jackpots) / total) * 100, 2) if total > 0 else 0
         
-        # Convert history to list for JSON response
-        history_list = list(history_logs)
-        
         return send_response(True, 'Data fetched successfully', {
             'current': response,
-            'history': history_list,
+            'history': list(history_logs),
             'stats': {
                 'wins': wins,
                 'losses': losses,
@@ -171,17 +156,12 @@ def handle_get():
 
 # ==================== VERCEL HANDLER ====================
 def handler(request):
-    """
-    Vercel serverless function handler
-    """
-    # CORS headers
     headers = {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type'
     }
     
-    # Handle CORS preflight
     if request.method == 'OPTIONS':
         return {
             'statusCode': 200,
@@ -189,7 +169,6 @@ def handler(request):
             'body': ''
         }
     
-    # Only allow GET
     if request.method != 'GET':
         return {
             'statusCode': 405,
@@ -197,7 +176,6 @@ def handler(request):
             'body': json.dumps(send_response(False, 'Only GET method is allowed'))
         }
     
-    # Process request
     response = handle_get()
     
     return {
@@ -231,5 +209,4 @@ if __name__ == '__main__':
     server = HTTPServer(('0.0.0.0', port), LocalHandler)
     print(f'🚀 Server running on http://localhost:{port}')
     print(f'📡 API endpoint: http://localhost:{port}/api')
-    print(f'💾 No database required - all data in memory')
     server.serve_forever()
